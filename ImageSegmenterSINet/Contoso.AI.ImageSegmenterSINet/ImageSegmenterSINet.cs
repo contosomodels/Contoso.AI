@@ -21,7 +21,8 @@ public sealed class ImageSegmenterSINet : IDisposable
     private readonly int _modelInputHeight;
     private bool _disposed;
 
-    private const string ModelPath = "Models/SINet/model.onnx";
+    private const string FloatModelPath = "Models/SINet/float/model.onnx";
+    private const string QuantizedModelPath = "Models/SINet/quantized/model.onnx";
 
     /// <summary>
     /// Private constructor - use <see cref="CreateAsync"/> factory method.
@@ -43,10 +44,10 @@ public sealed class ImageSegmenterSINet : IDisposable
     {
         try
         {
-            // Check if model file exists
-            if (!File.Exists(ModelPath))
+            // Check if model files exist
+            if (!File.Exists(FloatModelPath) && !File.Exists(QuantizedModelPath))
             {
-                Debug.WriteLine($"[ImageSegmenterSINet] Model file not found: {ModelPath}");
+                Debug.WriteLine($"[ImageSegmenterSINet] Model files not found");
                 return AIFeatureReadyState.NotReady;
             }
 
@@ -84,10 +85,10 @@ public sealed class ImageSegmenterSINet : IDisposable
     {
         try
         {
-            // Check if model file exists
-            if (!File.Exists(ModelPath))
+            // Check if model files exist
+            if (!File.Exists(FloatModelPath) && !File.Exists(QuantizedModelPath))
             {
-                throw new FileNotFoundException($"Model file not found: {ModelPath}");
+                throw new FileNotFoundException($"Model files not found: {FloatModelPath} or {QuantizedModelPath}");
             }
 
             // Get the Windows ML EP catalog
@@ -126,9 +127,9 @@ public sealed class ImageSegmenterSINet : IDisposable
     /// <exception cref="InvalidOperationException">Thrown when initialization fails.</exception>
     public static async Task<ImageSegmenterSINet> CreateAsync()
     {
-        if (!File.Exists(ModelPath))
+        if (!File.Exists(FloatModelPath) && !File.Exists(QuantizedModelPath))
         {
-            throw new FileNotFoundException($"Model file not found: {ModelPath}");
+            throw new FileNotFoundException($"Model files not found: {FloatModelPath} or {QuantizedModelPath}");
         }
 
         // Ensure dependencies are ready
@@ -145,14 +146,32 @@ public sealed class ImageSegmenterSINet : IDisposable
         // Get the available EP devices
         var epDevices = env.GetEpDevices();
 
-        // Prefer QNN NPU, fall back to CPU
-        var ep = epDevices.FirstOrDefault(i =>
+        // Check if QNN NPU is available
+        var qnnEp = epDevices.FirstOrDefault(i =>
             i.EpName == "QNNExecutionProvider" &&
             i.HardwareDevice.Type == OrtHardwareDeviceType.NPU);
 
-        if (ep == null)
+        // Select model and execution provider based on availability
+        string modelPath;
+        OrtEpDevice ep;
+
+        if (qnnEp != null && File.Exists(QuantizedModelPath))
         {
+            // Use quantized model with QNN NPU
+            modelPath = QuantizedModelPath;
+            ep = qnnEp;
+            Debug.WriteLine("[ImageSegmenterSINet] Using quantized model with QNN NPU");
+        }
+        else if (File.Exists(FloatModelPath))
+        {
+            // Fall back to float model with CPU
+            modelPath = FloatModelPath;
             ep = epDevices.First(i => i.EpName == "CPUExecutionProvider");
+            Debug.WriteLine("[ImageSegmenterSINet] Using float model with CPU");
+        }
+        else
+        {
+            throw new FileNotFoundException("No suitable model found for available execution provider");
         }
 
         // Configure session options
@@ -160,7 +179,7 @@ public sealed class ImageSegmenterSINet : IDisposable
         sessionOptions.AppendExecutionProvider(env, new[] { ep }, null);
 
         // Create the inference session
-        var session = new InferenceSession(ModelPath, sessionOptions);
+        var session = new InferenceSession(modelPath, sessionOptions);
 
         // Get input metadata
         var inputMeta = session.InputMetadata.First();
@@ -169,8 +188,9 @@ public sealed class ImageSegmenterSINet : IDisposable
         var modelInputHeight = dimensions[2];
         var modelInputWidth = dimensions[3];
 
-        Debug.WriteLine($"[ImageSegmenterSINet] Created with model: {ModelPath}");
+        Debug.WriteLine($"[ImageSegmenterSINet] Created with model: {modelPath}");
         Debug.WriteLine($"[ImageSegmenterSINet] Model input size: {modelInputWidth}x{modelInputHeight}");
+        Debug.WriteLine($"[ImageSegmenterSINet] Execution provider: {ep.EpName}");
 
         return new ImageSegmenterSINet(env, session, inputName, modelInputWidth, modelInputHeight);
     }

@@ -1,71 +1,149 @@
 <Project>
   <PropertyGroup>
-    <!-- Configure these for the SINet model -->
-    <ModelUrl>https://huggingface.co/qualcomm/SINet/resolve/v0.45.0/SINet_float.onnx.zip</ModelUrl>
-    <ModelZipFileName>SINet_float.onnx.zip</ModelZipFileName>
-    <ModelFileName>model.onnx</ModelFileName>
+    <!-- Configure these for the SINet models -->
+    <FloatModelUrl>https://huggingface.co/qualcomm/SINet/resolve/v0.45.0/SINet_float.onnx.zip</FloatModelUrl>
+    <FloatModelZipFileName>SINet_float.onnx.zip</FloatModelZipFileName>
+    <FloatModelFileName>model.onnx</FloatModelFileName>
+    <FloatModelFolderName>float</FloatModelFolderName>
+    
+    <QuantizedModelUrl>https://huggingface.co/qualcomm/SINet/resolve/main/SINet_w8a8.onnx.zip</QuantizedModelUrl>
+    <QuantizedModelZipFileName>SINet_w8a8.onnx.zip</QuantizedModelZipFileName>
+    <QuantizedModelFileName>model.onnx</QuantizedModelFileName>
+    <QuantizedModelFolderName>quantized</QuantizedModelFolderName>
+    
     <ModelFolderName>SINet</ModelFolderName>
     
     <!-- Download to obj directory to avoid source control pollution -->
     <ModelDirectory>$(MSBuildProjectDirectory)\obj\Models</ModelDirectory>
     <ModelExtractDirectory>$(ModelDirectory)\$(ModelFolderName)</ModelExtractDirectory>
+    <FloatModelExtractDirectory>$(ModelExtractDirectory)\$(FloatModelFolderName)</FloatModelExtractDirectory>
+    <QuantizedModelExtractDirectory>$(ModelExtractDirectory)\$(QuantizedModelFolderName)</QuantizedModelExtractDirectory>
   </PropertyGroup>
 
-  <!-- Download model at build time -->
-  <Target Name="DownloadImageSegmenterSINetModel" BeforeTargets="BeforeBuild">
+  <!-- Download float model at build time -->
+  <Target Name="DownloadImageSegmenterSINetFloatModel" BeforeTargets="BeforeBuild">
     <PropertyGroup>
-      <ModelZipFilePath>$(ModelDirectory)\$(ModelZipFileName)</ModelZipFilePath>
-      <ModelFilePath>$(ModelExtractDirectory)\$(ModelFileName)</ModelFilePath>
+      <FloatModelZipFilePath>$(ModelDirectory)\$(FloatModelZipFileName)</FloatModelZipFilePath>
+      <FloatModelFilePath>$(FloatModelExtractDirectory)\$(FloatModelFileName)</FloatModelFilePath>
     </PropertyGroup>
     
     <!-- Create directories -->
     <MakeDir Directories="$(ModelDirectory)" Condition="!Exists('$(ModelDirectory)')" />
-    <MakeDir Directories="$(ModelExtractDirectory)" Condition="!Exists('$(ModelExtractDirectory)')" />
+    <MakeDir Directories="$(FloatModelExtractDirectory)" Condition="!Exists('$(FloatModelExtractDirectory)')" />
     
     <!-- Status messages -->
-    <Message Text="[Contoso.AI.ImageSegmenterSINet] Checking for model at: $(ModelFilePath)" Importance="high" />
-    <Message Text="[Contoso.AI.ImageSegmenterSINet] Model already exists, skipping download." 
-             Importance="high" Condition="Exists('$(ModelFilePath)')" />
+    <Message Text="[Contoso.AI.ImageSegmenterSINet] Checking for float model at: $(FloatModelFilePath)" Importance="high" />
+    <Message Text="[Contoso.AI.ImageSegmenterSINet] Float model already exists, skipping download." 
+             Importance="high" Condition="Exists('$(FloatModelFilePath)')" />
     
     <!-- Download ZIP file -->
     <DownloadFile 
-      SourceUrl="$(ModelUrl)" 
+      SourceUrl="$(FloatModelUrl)" 
       DestinationFolder="$(ModelDirectory)"
-      DestinationFileName="$(ModelZipFileName)"
-      Condition="!Exists('$(ModelFilePath)')"
+      DestinationFileName="$(FloatModelZipFileName)"
+      Condition="!Exists('$(FloatModelFilePath)')"
       SkipUnchangedFiles="true" />
       
-    <Message Text="[Contoso.AI.ImageSegmenterSINet] Model ZIP downloaded successfully" 
+    <Message Text="[Contoso.AI.ImageSegmenterSINet] Float model ZIP downloaded successfully" 
              Importance="high" 
-             Condition="!Exists('$(ModelFilePath)') AND Exists('$(ModelZipFilePath)')" />
+             Condition="!Exists('$(FloatModelFilePath)') AND Exists('$(FloatModelZipFilePath)')" />
     
     <!-- Extract ZIP file to temp directory -->
     <Unzip 
-      SourceFiles="$(ModelZipFilePath)" 
-      DestinationFolder="$(ModelDirectory)\temp"
-      Condition="!Exists('$(ModelFilePath)') AND Exists('$(ModelZipFilePath)')" />
+      SourceFiles="$(FloatModelZipFilePath)" 
+      DestinationFolder="$(ModelDirectory)\temp_float"
+      Condition="!Exists('$(FloatModelFilePath)') AND Exists('$(FloatModelZipFilePath)')" />
       
-    <!-- Find and move extracted ONNX files -->
+    <!-- Find all files in the extracted job folder -->
     <ItemGroup>
-      <ExtractedModelFiles Include="$(ModelDirectory)\temp\**\*.onnx" />
+      <ExtractedFloatFiles Include="$(ModelDirectory)\temp_float\**\*.*" />
     </ItemGroup>
     
+    <!-- Copy all files to the float directory, flattening the structure -->
     <Copy
-      SourceFiles="@(ExtractedModelFiles)"
-      DestinationFolder="$(ModelExtractDirectory)"
-      Condition="!Exists('$(ModelFilePath)')" />
+      SourceFiles="@(ExtractedFloatFiles)"
+      DestinationFiles="@(ExtractedFloatFiles->'$(FloatModelExtractDirectory)\%(Filename)%(Extension)')"
+      Condition="!Exists('$(FloatModelFilePath)')" />
       
     <!-- Clean up temp directory -->
-    <RemoveDir Directories="$(ModelDirectory)\temp" Condition="Exists('$(ModelDirectory)\temp')" />
+    <RemoveDir Directories="$(ModelDirectory)\temp_float" Condition="Exists('$(ModelDirectory)\temp_float')" />
       
-    <Message Text="[Contoso.AI.ImageSegmenterSINet] Model extracted successfully to $(ModelFilePath)" 
-             Importance="high" Condition="Exists('$(ModelFilePath)')" />
+    <Message Text="[Contoso.AI.ImageSegmenterSINet] Float model extracted successfully to $(FloatModelExtractDirectory)" 
+             Importance="high" Condition="Exists('$(FloatModelFilePath)')" />
     
-    <!-- Add model files to output -->
+    <!-- Add all model files to output (ONNX and any external data files) -->
     <ItemGroup>
-      <Content Include="$(ModelFilePath)" Condition="Exists('$(ModelFilePath)')">
+      <FloatModelContentFiles Include="$(FloatModelExtractDirectory)\*.*" />
+    </ItemGroup>
+    
+    <ItemGroup>
+      <Content Include="@(FloatModelContentFiles)" Condition="Exists('$(FloatModelFilePath)')">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-        <Link>Models\$(ModelFolderName)\$(ModelFileName)</Link>
+        <Link>Models\$(ModelFolderName)\$(FloatModelFolderName)\%(Filename)%(Extension)</Link>
+      </Content>
+    </ItemGroup>
+  </Target>
+
+  <!-- Download quantized model at build time -->
+  <Target Name="DownloadImageSegmenterSINetQuantizedModel" BeforeTargets="BeforeBuild">
+    <PropertyGroup>
+      <QuantizedModelZipFilePath>$(ModelDirectory)\$(QuantizedModelZipFileName)</QuantizedModelZipFilePath>
+      <QuantizedModelFilePath>$(QuantizedModelExtractDirectory)\$(QuantizedModelFileName)</QuantizedModelFilePath>
+    </PropertyGroup>
+    
+    <!-- Create directories -->
+    <MakeDir Directories="$(ModelDirectory)" Condition="!Exists('$(ModelDirectory)')" />
+    <MakeDir Directories="$(QuantizedModelExtractDirectory)" Condition="!Exists('$(QuantizedModelExtractDirectory)')" />
+    
+    <!-- Status messages -->
+    <Message Text="[Contoso.AI.ImageSegmenterSINet] Checking for quantized model at: $(QuantizedModelFilePath)" Importance="high" />
+    <Message Text="[Contoso.AI.ImageSegmenterSINet] Quantized model already exists, skipping download." 
+             Importance="high" Condition="Exists('$(QuantizedModelFilePath)')" />
+    
+    <!-- Download ZIP file -->
+    <DownloadFile 
+      SourceUrl="$(QuantizedModelUrl)" 
+      DestinationFolder="$(ModelDirectory)"
+      DestinationFileName="$(QuantizedModelZipFileName)"
+      Condition="!Exists('$(QuantizedModelFilePath)')"
+      SkipUnchangedFiles="true" />
+      
+    <Message Text="[Contoso.AI.ImageSegmenterSINet] Quantized model ZIP downloaded successfully" 
+             Importance="high" 
+             Condition="!Exists('$(QuantizedModelFilePath)') AND Exists('$(QuantizedModelZipFilePath)')" />
+    
+    <!-- Extract ZIP file to temp directory -->
+    <Unzip 
+      SourceFiles="$(QuantizedModelZipFilePath)" 
+      DestinationFolder="$(ModelDirectory)\temp_quantized"
+      Condition="!Exists('$(QuantizedModelFilePath)') AND Exists('$(QuantizedModelZipFilePath)')" />
+      
+    <!-- Find all files in the extracted job folder -->
+    <ItemGroup>
+      <ExtractedQuantizedFiles Include="$(ModelDirectory)\temp_quantized\**\*.*" />
+    </ItemGroup>
+    
+    <!-- Copy all files to the quantized directory, flattening the structure -->
+    <Copy
+      SourceFiles="@(ExtractedQuantizedFiles)"
+      DestinationFiles="@(ExtractedQuantizedFiles->'$(QuantizedModelExtractDirectory)\%(Filename)%(Extension)')"
+      Condition="!Exists('$(QuantizedModelFilePath)')" />
+      
+    <!-- Clean up temp directory -->
+    <RemoveDir Directories="$(ModelDirectory)\temp_quantized" Condition="Exists('$(ModelDirectory)\temp_quantized')" />
+      
+    <Message Text="[Contoso.AI.ImageSegmenterSINet] Quantized model extracted successfully to $(QuantizedModelExtractDirectory)" 
+             Importance="high" Condition="Exists('$(QuantizedModelFilePath)')" />
+    
+    <!-- Add all model files to output (ONNX and any external data files like model.data) -->
+    <ItemGroup>
+      <QuantizedModelContentFiles Include="$(QuantizedModelExtractDirectory)\*.*" />
+    </ItemGroup>
+    
+    <ItemGroup>
+      <Content Include="@(QuantizedModelContentFiles)" Condition="Exists('$(QuantizedModelFilePath)')">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        <Link>Models\$(ModelFolderName)\$(QuantizedModelFolderName)\%(Filename)%(Extension)</Link>
       </Content>
     </ItemGroup>
   </Target>

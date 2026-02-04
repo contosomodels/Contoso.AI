@@ -24,7 +24,8 @@ foreground.Save("foreground.png");
 
 - ✅ Foreground/background segmentation using SINet
 - ✅ NPU hardware acceleration (QNN Execution Provider)
-- ✅ Automatic model download at build time
+- ✅ Automatic model download at build time (both float and quantized models)
+- ✅ Intelligent model selection: quantized for NPU, float for CPU
 - ✅ Easy-to-use async factory pattern
 - ✅ Multiple output formats (mask, overlay, extracted foreground)
 
@@ -32,7 +33,19 @@ foreground.Save("foreground.png");
 
 - Windows 10 SDK 19041+
 - .NET 8.0+
-- NPU recommended for best performance (falls back to CPU)
+- NPU recommended for best performance (falls back to CPU automatically)
+
+## Model Selection
+
+The library automatically downloads two ONNX models at build time:
+- **Quantized (int8) model** - Optimized for QNN NPU acceleration
+- **Float (fp32) model** - Optimized for CPU execution
+
+At runtime, `CreateAsync()` intelligently selects:
+- Quantized model when QNN NPU is available
+- Float model when falling back to CPU
+
+This ensures optimal performance and compatibility across different hardware configurations.
 
 ## API
 
