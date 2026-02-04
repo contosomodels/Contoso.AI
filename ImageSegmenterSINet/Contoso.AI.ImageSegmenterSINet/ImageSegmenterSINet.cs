@@ -19,6 +19,7 @@ public sealed class ImageSegmenterSINet : IDisposable
     private readonly string _inputName;
     private readonly int _modelInputWidth;
     private readonly int _modelInputHeight;
+    private readonly bool _isQuantized;
     private bool _disposed;
 
     private const string FloatModelPath = "Models/SINet/float/model.onnx";
@@ -27,13 +28,14 @@ public sealed class ImageSegmenterSINet : IDisposable
     /// <summary>
     /// Private constructor - use <see cref="CreateAsync"/> factory method.
     /// </summary>
-    private ImageSegmenterSINet(OrtEnv env, InferenceSession session, string inputName, int modelInputWidth, int modelInputHeight)
+    private ImageSegmenterSINet(OrtEnv env, InferenceSession session, string inputName, int modelInputWidth, int modelInputHeight, bool isQuantized)
     {
         _env = env;
         _session = session;
         _inputName = inputName;
         _modelInputWidth = modelInputWidth;
         _modelInputHeight = modelInputHeight;
+        _isQuantized = isQuantized;
     }
 
     /// <summary>
@@ -154,12 +156,14 @@ public sealed class ImageSegmenterSINet : IDisposable
         // Select model and execution provider based on availability
         string modelPath;
         OrtEpDevice ep;
+        bool isQuantized;
 
         if (qnnEp != null && File.Exists(QuantizedModelPath))
         {
             // Use quantized model with QNN NPU
             modelPath = QuantizedModelPath;
             ep = qnnEp;
+            isQuantized = true;
             Debug.WriteLine("[ImageSegmenterSINet] Using quantized model with QNN NPU");
         }
         else if (File.Exists(FloatModelPath))
@@ -167,6 +171,7 @@ public sealed class ImageSegmenterSINet : IDisposable
             // Fall back to float model with CPU
             modelPath = FloatModelPath;
             ep = epDevices.First(i => i.EpName == "CPUExecutionProvider");
+            isQuantized = false;
             Debug.WriteLine("[ImageSegmenterSINet] Using float model with CPU");
         }
         else
@@ -191,8 +196,9 @@ public sealed class ImageSegmenterSINet : IDisposable
         Debug.WriteLine($"[ImageSegmenterSINet] Created with model: {modelPath}");
         Debug.WriteLine($"[ImageSegmenterSINet] Model input size: {modelInputWidth}x{modelInputHeight}");
         Debug.WriteLine($"[ImageSegmenterSINet] Execution provider: {ep.EpName}");
+        Debug.WriteLine($"[ImageSegmenterSINet] Model type: {(isQuantized ? "Quantized (UInt8)" : "Float (FP32)")}");
 
-        return new ImageSegmenterSINet(env, session, inputName, modelInputWidth, modelInputHeight);
+        return new ImageSegmenterSINet(env, session, inputName, modelInputWidth, modelInputHeight, isQuantized);
     }
 
     /// <summary>
@@ -213,19 +219,42 @@ public sealed class ImageSegmenterSINet : IDisposable
         // Resize with padding to match model input dimensions
         using var resizedImage = ResizeWithPadding(bitmap, _modelInputWidth, _modelInputHeight);
 
-        // Preprocess the image
-        var inputDimensions = new int[] { 1, 3, _modelInputHeight, _modelInputWidth };
-        Tensor<float> input = new DenseTensor<float>(inputDimensions);
-        input = PreprocessBitmap(resizedImage, input);
-
-        // Run inference
-        var inputs = new List<NamedOnnxValue>
+        // Run inference based on model type
+        IEnumerable<float> output;
+        
+        if (_isQuantized)
         {
-            NamedOnnxValue.CreateFromTensor(_inputName, input)
-        };
+            // Quantized model expects UInt8 input
+            var inputDimensions = new int[] { 1, 3, _modelInputHeight, _modelInputWidth };
+            Tensor<byte> input = new DenseTensor<byte>(inputDimensions);
+            input = PreprocessBitmapQuantized(resizedImage, input);
 
-        using var results = _session.Run(inputs);
-        var output = results[0].AsEnumerable<float>();
+            var inputs = new List<NamedOnnxValue>
+            {
+                NamedOnnxValue.CreateFromTensor(_inputName, input)
+            };
+
+            using var results = _session.Run(inputs);
+            
+            // Quantized model output is also UInt8, need to dequantize to float
+            var rawOutput = results[0].AsTensor<byte>();
+            output = DequantizeOutput(rawOutput);
+        }
+        else
+        {
+            // Float model expects Float input
+            var inputDimensions = new int[] { 1, 3, _modelInputHeight, _modelInputWidth };
+            Tensor<float> input = new DenseTensor<float>(inputDimensions);
+            input = PreprocessBitmapFloat(resizedImage, input);
+
+            var inputs = new List<NamedOnnxValue>
+            {
+                NamedOnnxValue.CreateFromTensor(_inputName, input)
+            };
+
+            using var results = _session.Run(inputs);
+            output = results[0].AsEnumerable<float>();
+        }
 
         // Generate foreground mask
         var maskData = GetForegroundMask(output, _modelInputWidth, _modelInputHeight, originalWidth, originalHeight);
@@ -375,7 +404,7 @@ public sealed class ImageSegmenterSINet : IDisposable
         return paddedBitmap;
     }
 
-    private static Tensor<float> PreprocessBitmap(Bitmap bitmap, Tensor<float> input)
+    private static Tensor<float> PreprocessBitmapFloat(Bitmap bitmap, Tensor<float> input)
     {
         int width = bitmap.Width;
         int height = bitmap.Height;
@@ -416,6 +445,63 @@ public sealed class ImageSegmenterSINet : IDisposable
         }
 
         return input;
+    }
+
+    private static Tensor<byte> PreprocessBitmapQuantized(Bitmap bitmap, Tensor<byte> input)
+    {
+        int width = bitmap.Width;
+        int height = bitmap.Height;
+
+        BitmapData bmpData = bitmap.LockBits(
+            new Rectangle(0, 0, width, height),
+            ImageLockMode.ReadOnly,
+            PixelFormat.Format24bppRgb);
+
+        try
+        {
+            int stride = bmpData.Stride;
+            IntPtr ptr = bmpData.Scan0;
+            int bytes = Math.Abs(stride) * height;
+            byte[] rgbValues = new byte[bytes];
+
+            Marshal.Copy(ptr, rgbValues, 0, bytes);
+
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    int index = y * stride + x * 3;
+                    byte blue = rgbValues[index];
+                    byte green = rgbValues[index + 1];
+                    byte red = rgbValues[index + 2];
+
+                    // Quantized model expects raw byte values (0-255)
+                    input[0, 0, y, x] = red;
+                    input[0, 1, y, x] = green;
+                    input[0, 2, y, x] = blue;
+                }
+            }
+        }
+        finally
+        {
+            bitmap.UnlockBits(bmpData);
+        }
+
+        return input;
+    }
+
+    private static IEnumerable<float> DequantizeOutput(Tensor<byte> quantizedOutput)
+    {
+        // Convert UInt8 output to float (0-255 -> 0.0-1.0)
+        var outputArray = quantizedOutput.ToArray();
+        var floatOutput = new float[outputArray.Length];
+        
+        for (int i = 0; i < outputArray.Length; i++)
+        {
+            floatOutput[i] = outputArray[i] / 255f;
+        }
+        
+        return floatOutput;
     }
 
     private static byte[] GetForegroundMask(IEnumerable<float> output, int maskWidth, int maskHeight, int originalWidth, int originalHeight)
