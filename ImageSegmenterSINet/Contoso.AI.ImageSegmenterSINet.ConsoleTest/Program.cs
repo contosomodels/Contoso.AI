@@ -83,12 +83,12 @@ try
     // Create and save mask overlay
     Console.WriteLine("Creating visualization outputs...");
     
-    using var overlay = ImageSegmenterSINet.CreateMaskOverlay(bitmap, result);
+    using var overlay = result.CreateMaskOverlay(bitmap);
     overlay.Save(outputOverlayPath, ImageFormat.Png);
     Console.WriteLine($"  Saved mask overlay to: {outputOverlayPath}");
 
     // Create and save foreground extraction
-    using var foreground = ImageSegmenterSINet.ExtractForeground(bitmap, result);
+    using var foreground = result.ExtractForeground(bitmap);
     foreground.Save(outputForegroundPath, ImageFormat.Png);
     Console.WriteLine($"  Saved extracted foreground to: {outputForegroundPath}");
 
