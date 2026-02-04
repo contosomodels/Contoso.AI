@@ -1,0 +1,72 @@
+<Project>
+  <PropertyGroup>
+    <!-- Configure these for the SINet model -->
+    <ModelUrl>https://huggingface.co/qualcomm/SINet/resolve/v0.45.0/SINet_float.onnx.zip</ModelUrl>
+    <ModelZipFileName>SINet_float.onnx.zip</ModelZipFileName>
+    <ModelFileName>model.onnx</ModelFileName>
+    <ModelFolderName>SINet</ModelFolderName>
+    
+    <!-- Download to obj directory to avoid source control pollution -->
+    <ModelDirectory>$(MSBuildProjectDirectory)\obj\Models</ModelDirectory>
+    <ModelExtractDirectory>$(ModelDirectory)\$(ModelFolderName)</ModelExtractDirectory>
+  </PropertyGroup>
+
+  <!-- Download model at build time -->
+  <Target Name="DownloadImageSegmenterSINetModel" BeforeTargets="BeforeBuild">
+    <PropertyGroup>
+      <ModelZipFilePath>$(ModelDirectory)\$(ModelZipFileName)</ModelZipFilePath>
+      <ModelFilePath>$(ModelExtractDirectory)\$(ModelFileName)</ModelFilePath>
+    </PropertyGroup>
+    
+    <!-- Create directories -->
+    <MakeDir Directories="$(ModelDirectory)" Condition="!Exists('$(ModelDirectory)')" />
+    <MakeDir Directories="$(ModelExtractDirectory)" Condition="!Exists('$(ModelExtractDirectory)')" />
+    
+    <!-- Status messages -->
+    <Message Text="[Contoso.AI.ImageSegmenterSINet] Checking for model at: $(ModelFilePath)" Importance="high" />
+    <Message Text="[Contoso.AI.ImageSegmenterSINet] Model already exists, skipping download." 
+             Importance="high" Condition="Exists('$(ModelFilePath)')" />
+    
+    <!-- Download ZIP file -->
+    <DownloadFile 
+      SourceUrl="$(ModelUrl)" 
+      DestinationFolder="$(ModelDirectory)"
+      DestinationFileName="$(ModelZipFileName)"
+      Condition="!Exists('$(ModelFilePath)')"
+      SkipUnchangedFiles="true" />
+      
+    <Message Text="[Contoso.AI.ImageSegmenterSINet] Model ZIP downloaded successfully" 
+             Importance="high" 
+             Condition="!Exists('$(ModelFilePath)') AND Exists('$(ModelZipFilePath)')" />
+    
+    <!-- Extract ZIP file to temp directory -->
+    <Unzip 
+      SourceFiles="$(ModelZipFilePath)" 
+      DestinationFolder="$(ModelDirectory)\temp"
+      Condition="!Exists('$(ModelFilePath)') AND Exists('$(ModelZipFilePath)')" />
+      
+    <!-- Find and move extracted ONNX files -->
+    <ItemGroup>
+      <ExtractedModelFiles Include="$(ModelDirectory)\temp\**\*.onnx" />
+    </ItemGroup>
+    
+    <Copy
+      SourceFiles="@(ExtractedModelFiles)"
+      DestinationFolder="$(ModelExtractDirectory)"
+      Condition="!Exists('$(ModelFilePath)')" />
+      
+    <!-- Clean up temp directory -->
+    <RemoveDir Directories="$(ModelDirectory)\temp" Condition="Exists('$(ModelDirectory)\temp')" />
+      
+    <Message Text="[Contoso.AI.ImageSegmenterSINet] Model extracted successfully to $(ModelFilePath)" 
+             Importance="high" Condition="Exists('$(ModelFilePath)')" />
+    
+    <!-- Add model files to output -->
+    <ItemGroup>
+      <Content Include="$(ModelFilePath)" Condition="Exists('$(ModelFilePath)')">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        <Link>Models\$(ModelFolderName)\$(ModelFileName)</Link>
+      </Content>
+    </ItemGroup>
+  </Target>
+</Project>

@@ -8,6 +8,7 @@ A mono-repo containing AI-powered NuGet packages for Windows applications. Each 
 |---------|-------------|-------|
 | [PersonDetector](PersonDetector/) | Detect people in images using YOLO-based object detection | [![NuGet](https://img.shields.io/nuget/v/Contoso.AI.PersonDetector)](https://www.nuget.org/packages/Contoso.AI.PersonDetector) |
 | [PolitenessAnalyzer](PolitenessAnalyzer/) | Analyze text for politeness levels using BERT-based NLP | [![NuGet](https://img.shields.io/nuget/v/Contoso.AI.PolitenessAnalyzer)](https://www.nuget.org/packages/Contoso.AI.PolitenessAnalyzer) |
+| [ImageSegmenterSINet](ImageSegmenterSINet/) | Segment images using SINet for salient object detection | [![NuGet](https://img.shields.io/nuget/v/Contoso.AI.ImageSegmenterSINet)](https://www.nuget.org/packages/Contoso.AI.ImageSegmenterSINet) |
 
 ## ✨ Features
 
@@ -62,6 +63,9 @@ Contoso.AI/
 ├── PolitenessAnalyzer/      # Politeness analysis project
 │   ├── Contoso.AI.PolitenessAnalyzer/
 │   └── Contoso.AI.PolitenessAnalyzer.ConsoleTest/
+├── ImageSegmenterSINet/     # Image segmentation project
+│   ├── Contoso.AI.ImageSegmenterSINet/
+│   └── Contoso.AI.ImageSegmenterSINet.ConsoleTest/
 ├── CREATING_NEW_AI_MODEL_PROJECTS.md
 └── README.md
 ```

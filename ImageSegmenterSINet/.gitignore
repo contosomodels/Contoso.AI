@@ -1,0 +1,31 @@
+# Build outputs
+bin/
+obj/
+
+# IDE
+.vs/
+.vscode/
+*.user
+*.suo
+
+# NuGet
+*.nupkg
+packages/
+
+# Model files (downloaded at build time)
+**/Models/
+*.onnx
+*.onnx.zip
+
+# Test outputs
+output_*.png
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Rider
+.idea/
+
+# Logs
+*.log
