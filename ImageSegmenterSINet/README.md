@@ -59,7 +59,7 @@ Console.WriteLine($"Foreground detected: {result.HasForeground}");
 Console.WriteLine($"Foreground coverage: {result.Mask.GetForegroundPercentage():P2}");
 
 // Extract foreground with transparent background
-using var foreground = ImageSegmenterSINet.ExtractForeground(bitmap, result);
+using var foreground = result.ExtractForeground(bitmap);
 foreground.Save("foreground.png");
 ```
 
@@ -95,17 +95,17 @@ using var segmenter = await ImageSegmenterSINet.CreateAsync();
 | `EnsureReadyAsync()` | Static. Downloads and prepares all required dependencies |
 | `CreateAsync()` | Static factory. Creates and initializes a new `ImageSegmenterSINet` instance |
 | `SegmentImage(Bitmap)` | Performs segmentation on the provided image |
-| `CreateMaskOverlay(Bitmap, ImageSegmentationResult, Color?)` | Static. Creates a visualization overlay |
-| `ExtractForeground(Bitmap, ImageSegmentationResult)` | Static. Extracts foreground with transparent background |
 
 ### ImageSegmentationResult Class
 
-| Property | Type | Description |
-|----------|------|-------------|
+| Property/Method | Type | Description |
+|-----------------|------|-------------|
 | `Mask` | `SegmentationMask` | The segmentation mask data |
 | `OriginalWidth` | `int` | Original image width |
 | `OriginalHeight` | `int` | Original image height |
 | `HasForeground` | `bool` | Whether any foreground was detected |
+| `CreateMaskOverlay(Bitmap, Color?)` | `Bitmap` | Creates a visualization overlay with the mask on the original image |
+| `ExtractForeground(Bitmap)` | `Bitmap` | Extracts foreground with transparent background |
 
 ### SegmentationMask Class
 
