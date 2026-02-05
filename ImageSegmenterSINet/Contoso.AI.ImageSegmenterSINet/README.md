@@ -8,6 +8,20 @@ AI-powered image segmentation using Qualcomm's SINet (Salient Image Network) ONN
 using Contoso.AI;
 using System.Drawing;
 
+// Check if the feature is ready
+var readyState = ImageSegmenterSINet.GetReadyState();
+
+if (readyState != AIFeatureReadyState.Ready)
+{
+    // Prepare the feature (downloads QNN Execution Provider if needed)
+    var readyResult = await ImageSegmenterSINet.EnsureReadyAsync();
+    if (readyResult.Status != AIFeatureReadyResultState.Success)
+    {
+        Console.WriteLine($"Failed to initialize: {readyResult.ExtendedError?.Message}");
+        return;
+    }
+}
+
 // Create segmenter (model downloads automatically at build time)
 using var segmenter = await ImageSegmenterSINet.CreateAsync();
 

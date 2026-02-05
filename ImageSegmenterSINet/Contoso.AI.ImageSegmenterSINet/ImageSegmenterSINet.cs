@@ -126,20 +126,20 @@ public sealed class ImageSegmenterSINet : IDisposable
     /// </summary>
     /// <returns>A task containing the initialized instance.</returns>
     /// <exception cref="FileNotFoundException">Thrown when the model file is not found.</exception>
-    /// <exception cref="InvalidOperationException">Thrown when initialization fails.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when the feature is not ready. Call EnsureReadyAsync() first.</exception>
     public static async Task<ImageSegmenterSINet> CreateAsync()
     {
+        // Check if feature is ready
+        var readyState = GetReadyState();
+        if (readyState != AIFeatureReadyState.Ready)
+        {
+            throw new InvalidOperationException(
+                "ImageSegmenterSINet is not ready. Call EnsureReadyAsync() before CreateAsync() to download required dependencies.");
+        }
+
         if (!File.Exists(FloatModelPath) && !File.Exists(QuantizedModelPath))
         {
             throw new FileNotFoundException($"Model files not found: {FloatModelPath} or {QuantizedModelPath}");
-        }
-
-        // Ensure dependencies are ready
-        var readyResult = await EnsureReadyAsync();
-        if (readyResult.Status != AIFeatureReadyResultState.Success)
-        {
-            throw readyResult.ExtendedError ??
-                new InvalidOperationException("Failed to prepare feature");
         }
 
         // Get the ORT environment
