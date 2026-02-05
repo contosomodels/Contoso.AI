@@ -1,6 +1,6 @@
 # Contoso.AI
 
-A mono-repo containing AI-powered NuGet packages for Windows applications. Each package provides easy-to-use APIs for machine learning features with automatic model download and NPU hardware acceleration.
+A mono-repo containing AI-powered NuGet packages for Windows applications. Each package provides easy-to-use APIs for machine learning features with automatic model download and hardware acceleration.
 
 ## 📦 Projects
 
@@ -12,8 +12,8 @@ A mono-repo containing AI-powered NuGet packages for Windows applications. Each 
 
 ## ✨ Features
 
-- **Automatic Model Download** - ONNX models download automatically at build time
-- **NPU Acceleration** - Hardware acceleration via Windows ML and QNN Execution Provider
+- **Model Is Included** - At build time, the ONNX models are automatically downloaded and compiled into your app if they haven't been yet
+- **NPU / GPU Acceleration When Possible** - Hardware acceleration via Windows ML and QNN Execution Provider
 - **Consistent APIs** - All packages follow the same patterns (`GetReadyState()`, `EnsureReadyAsync()`, `CreateAsync()`)
 - **NuGet Ready** - Each project publishes as a standalone NuGet package
 
@@ -21,7 +21,7 @@ A mono-repo containing AI-powered NuGet packages for Windows applications. Each 
 
 - Windows 10 SDK 19041 or later
 - .NET 8.0
-- NPU-capable hardware (optional, falls back to CPU)
+- Any hardware (CPUs, GPUs, NPUs)
 
 ## 🚀 Quick Start
 
