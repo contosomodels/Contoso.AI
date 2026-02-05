@@ -22,7 +22,7 @@ if (readyState != AIFeatureReadyState.Ready)
     }
 }
 
-// Create segmenter (model downloads automatically at build time)
+// Create segmenter instance
 using var segmenter = await ImageSegmenterSINet.CreateAsync();
 
 // Segment an image
