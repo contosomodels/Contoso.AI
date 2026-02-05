@@ -8,7 +8,21 @@ AI-powered image segmentation using Qualcomm's SINet (Salient Image Network) ONN
 using Contoso.AI;
 using System.Drawing;
 
-// Create segmenter (model downloads automatically at build time)
+// Check if the feature is ready
+var readyState = ImageSegmenterSINet.GetReadyState();
+
+if (readyState != AIFeatureReadyState.Ready)
+{
+    // Prepare the feature (downloads QNN Execution Provider if needed)
+    var readyResult = await ImageSegmenterSINet.EnsureReadyAsync();
+    if (readyResult.Status != AIFeatureReadyResultState.Success)
+    {
+        Console.WriteLine($"Failed to initialize: {readyResult.ExtendedError?.Message}");
+        return;
+    }
+}
+
+// Create segmenter instance
 using var segmenter = await ImageSegmenterSINet.CreateAsync();
 
 // Segment an image
@@ -16,7 +30,7 @@ using var bitmap = new Bitmap("photo.jpg");
 var result = segmenter.SegmentImage(bitmap);
 
 // Extract foreground with transparent background
-using var foreground = ImageSegmenterSINet.ExtractForeground(bitmap, result);
+using var foreground = result.ExtractForeground(bitmap);
 foreground.Save("foreground.png");
 ```
 
@@ -55,8 +69,8 @@ This ensures optimal performance and compatibility across different hardware con
 | `ImageSegmenterSINet.EnsureReadyAsync()` | Prepare dependencies |
 | `ImageSegmenterSINet.CreateAsync()` | Create segmenter instance |
 | `SegmentImage(Bitmap)` | Perform segmentation |
-| `CreateMaskOverlay(...)` | Visualize segmentation |
-| `ExtractForeground(...)` | Extract foreground with transparency |
+| `result.CreateMaskOverlay(Bitmap, Color?)` | Visualize segmentation on original image |
+| `result.ExtractForeground(Bitmap)` | Extract foreground with transparency |
 
 ## License
 

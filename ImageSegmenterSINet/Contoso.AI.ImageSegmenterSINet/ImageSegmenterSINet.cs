@@ -126,20 +126,20 @@ public sealed class ImageSegmenterSINet : IDisposable
     /// </summary>
     /// <returns>A task containing the initialized instance.</returns>
     /// <exception cref="FileNotFoundException">Thrown when the model file is not found.</exception>
-    /// <exception cref="InvalidOperationException">Thrown when initialization fails.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when the feature is not ready. Call EnsureReadyAsync() first.</exception>
     public static async Task<ImageSegmenterSINet> CreateAsync()
     {
+        // Check if feature is ready
+        var readyState = GetReadyState();
+        if (readyState != AIFeatureReadyState.Ready)
+        {
+            throw new InvalidOperationException(
+                "ImageSegmenterSINet is not ready. Call EnsureReadyAsync() before CreateAsync() to download required dependencies.");
+        }
+
         if (!File.Exists(FloatModelPath) && !File.Exists(QuantizedModelPath))
         {
             throw new FileNotFoundException($"Model files not found: {FloatModelPath} or {QuantizedModelPath}");
-        }
-
-        // Ensure dependencies are ready
-        var readyResult = await EnsureReadyAsync();
-        if (readyResult.Status != AIFeatureReadyResultState.Success)
-        {
-            throw readyResult.ExtendedError ??
-                new InvalidOperationException("Failed to prepare feature");
         }
 
         // Get the ORT environment
@@ -270,111 +270,6 @@ public sealed class ImageSegmenterSINet : IDisposable
             OriginalWidth = originalWidth,
             OriginalHeight = originalHeight
         };
-    }
-
-    /// <summary>
-    /// Creates a visual overlay of the segmentation mask on the original image.
-    /// </summary>
-    /// <param name="originalImage">The original image.</param>
-    /// <param name="result">The segmentation result.</param>
-    /// <param name="overlayColor">The color to use for the background overlay. Default is semi-transparent red.</param>
-    /// <returns>A new bitmap with the segmentation mask overlaid.</returns>
-    public static Bitmap CreateMaskOverlay(Bitmap originalImage, ImageSegmentationResult result, Color? overlayColor = null)
-    {
-        ArgumentNullException.ThrowIfNull(originalImage);
-        ArgumentNullException.ThrowIfNull(result);
-
-        var overlay = new Bitmap(originalImage);
-        var color = overlayColor ?? Color.FromArgb(100, 255, 0, 0);
-
-        using var g = Graphics.FromImage(overlay);
-        using var brush = new SolidBrush(color);
-
-        var mask = result.Mask;
-        for (int y = 0; y < mask.Height; y++)
-        {
-            for (int x = 0; x < mask.Width; x++)
-            {
-                int index = (y * mask.Width + x) * 4;
-                // If alpha channel indicates background (opaque = background in our mask)
-                if (mask.Data[index + 3] > 128)
-                {
-                    g.FillRectangle(brush, x, y, 1, 1);
-                }
-            }
-        }
-
-        return overlay;
-    }
-
-    /// <summary>
-    /// Extracts the foreground from an image, making the background transparent.
-    /// </summary>
-    /// <param name="originalImage">The original image.</param>
-    /// <param name="result">The segmentation result.</param>
-    /// <returns>A new bitmap with transparent background.</returns>
-    public static Bitmap ExtractForeground(Bitmap originalImage, ImageSegmentationResult result)
-    {
-        ArgumentNullException.ThrowIfNull(originalImage);
-        ArgumentNullException.ThrowIfNull(result);
-
-        var output = new Bitmap(originalImage.Width, originalImage.Height, PixelFormat.Format32bppArgb);
-        var mask = result.Mask;
-
-        var srcData = originalImage.LockBits(
-            new Rectangle(0, 0, originalImage.Width, originalImage.Height),
-            ImageLockMode.ReadOnly,
-            PixelFormat.Format32bppArgb);
-
-        var dstData = output.LockBits(
-            new Rectangle(0, 0, output.Width, output.Height),
-            ImageLockMode.WriteOnly,
-            PixelFormat.Format32bppArgb);
-
-        try
-        {
-            int stride = srcData.Stride;
-            int bytes = Math.Abs(stride) * originalImage.Height;
-            byte[] srcPixels = new byte[bytes];
-            byte[] dstPixels = new byte[bytes];
-
-            Marshal.Copy(srcData.Scan0, srcPixels, 0, bytes);
-
-            for (int y = 0; y < mask.Height; y++)
-            {
-                for (int x = 0; x < mask.Width; x++)
-                {
-                    int pixelIndex = y * stride + x * 4;
-                    int maskIndex = (y * mask.Width + x) * 4;
-
-                    // If background (mask alpha > 128), make transparent
-                    if (mask.Data[maskIndex + 3] > 128)
-                    {
-                        dstPixels[pixelIndex] = 0;     // B
-                        dstPixels[pixelIndex + 1] = 0; // G
-                        dstPixels[pixelIndex + 2] = 0; // R
-                        dstPixels[pixelIndex + 3] = 0; // A
-                    }
-                    else
-                    {
-                        // Keep foreground pixels
-                        dstPixels[pixelIndex] = srcPixels[pixelIndex];         // B
-                        dstPixels[pixelIndex + 1] = srcPixels[pixelIndex + 1]; // G
-                        dstPixels[pixelIndex + 2] = srcPixels[pixelIndex + 2]; // R
-                        dstPixels[pixelIndex + 3] = 255;                       // A (fully opaque)
-                    }
-                }
-            }
-
-            Marshal.Copy(dstPixels, 0, dstData.Scan0, bytes);
-        }
-        finally
-        {
-            originalImage.UnlockBits(srcData);
-            output.UnlockBits(dstData);
-        }
-
-        return output;
     }
 
     #region Private Helper Methods
