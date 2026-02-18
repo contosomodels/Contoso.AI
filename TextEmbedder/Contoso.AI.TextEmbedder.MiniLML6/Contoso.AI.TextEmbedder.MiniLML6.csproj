@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+		<Platforms>AnyCPU;x64</Platforms>
+		<EnableWindowsTargeting>true</EnableWindowsTargeting>
+
+		<!-- NuGet Package Configuration -->
+		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+		<PackageId>Contoso.AI.TextEmbedder.MiniLML6</PackageId>
+		<Version>0.1.0-beta</Version>
+		<Authors>Contoso</Authors>
+		<Company>Contoso</Company>
+		<Description>AI-powered text embedding using all-MiniLM-L6-v2 model. Converts text to 384-dimensional embeddings for semantic search and similarity tasks. Model downloads automatically at build time. Requires Windows 10 SDK 19041 or later.</Description>
+		<PackageLicenseExpression>MIT</PackageLicenseExpression>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
+
+		<!-- Platform Requirements -->
+		<SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Contoso.AI.AIFeatureCore" Version="0.0.1-beta" />
+		<PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.251106002" />
+		<PackageReference Include="System.Numerics.Tensors" Version="9.0.9" />
+		<PackageReference Include="Microsoft.ML.Tokenizers" Version="1.0.0" />
+		<PackageReference Include="Microsoft.ML.OnnxRuntimeGenAI" Version="0.7.0-rc1" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\Contoso.AI.TextEmbedder\Contoso.AI.TextEmbedder.csproj" />
+	</ItemGroup>
+
+	<!-- Include .targets file in NuGet package so consuming projects download the model -->
+	<ItemGroup>
+		<None Include="build\Contoso.AI.TextEmbedder.MiniLML6.targets" Pack="true" PackagePath="build" />
+		<None Include="build\Contoso.AI.TextEmbedder.MiniLML6.targets" Pack="true" PackagePath="buildTransitive" />
+		<None Include="README.md" Pack="true" PackagePath="\" />
+	</ItemGroup>
+
+</Project>

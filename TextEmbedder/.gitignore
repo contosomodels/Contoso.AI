@@ -1,0 +1,17 @@
+## Ignore build artifacts
+bin/
+obj/
+
+## Ignore NuGet packages
+*.nupkg
+
+## Ignore IDE files
+.vs/
+.vscode/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+## Ignore model downloads (they'll be re-downloaded on build)
+**/obj/Models/
