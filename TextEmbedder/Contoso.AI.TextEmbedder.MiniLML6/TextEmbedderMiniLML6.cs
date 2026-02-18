@@ -6,6 +6,7 @@ using System.Diagnostics;
 using System.Numerics.Tensors;
 using System.Text.RegularExpressions;
 using Tensor = System.Numerics.Tensors.Tensor;
+using Contoso.AI.TextEmbedder.MiniLML6;
 
 // 'System.Numerics.Tensors' is for evaluation purposes only and is subject to change or removal in future updates.
 #pragma warning disable SYSLIB5001
@@ -131,7 +132,7 @@ public sealed partial class TextEmbedderMiniLML6 : ITextEmbedder
             var providers = catalog.FindAllProviders();
             var dmlProvider = providers.FirstOrDefault(p => p.Name == "DmlExecutionProvider");
             
-            if (dmlProvider != null && dmlProvider.ReadyState == ExecutionProviderReadyState.Present)
+            if (dmlProvider != null && dmlProvider.ReadyState != ExecutionProviderReadyState.NotPresent)
             {
                 sessionOptions.AppendExecutionProvider_DML();
                 Debug.WriteLine("[TextEmbedderMiniLML6] Using DirectML (GPU) execution provider");
@@ -265,51 +266,41 @@ public sealed partial class TextEmbedderMiniLML6 : ITextEmbedder
         var sequenceLength = (int)shape[1];
         var embeddingSize = (int)shape[2];
 
-        // Create a tensor for attention mask
-        ReadOnlyTensorSpan<float> attentionMaskTensor = Tensor.ConvertSaturating<long, float>(
-            Tensor.Create(attentionMask, [batchSize, sequenceLength]));
+        // Create output tensor for mean pooled embeddings
+        float[] result = new float[batchSize * embeddingSize];
 
-        // Create a tensor for token embeddings
-        ReadOnlyTensorSpan<float> tokenEmbeddings = new ReadOnlyTensorSpan<float>(
-            embeddings, 
-            [(nint)batchSize, (nint)sequenceLength, (nint)embeddingSize], 
-            []);
-
-        // Add a dimension to attention mask [batch, sequence, 1]
-        ReadOnlyTensorSpan<float> unsqueezed = Tensor.Unsqueeze(attentionMaskTensor, 2);
-
-        // Multiply unsqueezed tensor with token embeddings
-        ReadOnlyTensorSpan<float> lhs = Tensor.Multiply(unsqueezed, tokenEmbeddings);
-
-        // Sum across the sequence dimension
-        var numerator = Tensor.CreateFromShape<float>([batchSize, embeddingSize]);
-        var denominator = Tensor.CreateFromShape<float>([batchSize, embeddingSize]);
-
-        for (var batch = 0; batch < batchSize; batch++)
+        for (int batch = 0; batch < batchSize; batch++)
         {
-            var sumEmbedding = Tensor.CreateFromShape<float>([1, embeddingSize]);
-            var sumAttention = Tensor.CreateFromShape<float>([1, embeddingSize]);
-            
-            for (var sequence = 0; sequence < sequenceLength; sequence++)
+            float[] sumEmbedding = new float[embeddingSize];
+            float sumMask = 0;
+
+            for (int seq = 0; seq < sequenceLength; seq++)
             {
-                ReadOnlyTensorSpan<float> embeddingSlice =
-                    Tensor.Squeeze(lhs.Slice([batch..(batch + 1), sequence..(sequence + 1), 0..embeddingSize]));
-
-                ReadOnlyTensorSpan<float> expandedAttSlice = 
-                    Tensor.Squeeze(Tensor.Broadcast<float>(
-                        unsqueezed.Slice([batch..(batch + 1), sequence..(sequence + 1), 0..1]),
-                        [1, embeddingSize]));
-
-                sumEmbedding = Tensor.Add<float>(sumEmbedding, embeddingSlice);
-                sumAttention = Tensor.Add<float>(sumAttention, expandedAttSlice);
+                int maskIdx = batch * sequenceLength + seq;
+                float mask = attentionMask[maskIdx];
+                
+                if (mask > 0)
+                {
+                    int embeddingOffset = (batch * sequenceLength + seq) * embeddingSize;
+                    
+                    for (int i = 0; i < embeddingSize; i++)
+                    {
+                        sumEmbedding[i] += embeddings[embeddingOffset + i] * mask;
+                    }
+                    
+                    sumMask += mask;
+                }
             }
 
-            Tensor.SetSlice(numerator, (ReadOnlyTensorSpan<float>)sumEmbedding, [batch..(batch + 1), 0..embeddingSize]);
-            Tensor.SetSlice(denominator, (ReadOnlyTensorSpan<float>)sumAttention, [batch..(batch + 1), 0..embeddingSize]);
+            // Calculate mean
+            int resultOffset = batch * embeddingSize;
+            for (int i = 0; i < embeddingSize; i++)
+            {
+                result[resultOffset + i] = sumMask > 0 ? sumEmbedding[i] / sumMask : 0;
+            }
         }
 
-        // Divide numerator by denominator (mean pooling)
-        return Tensor.Divide<float>(numerator, denominator);
+        return new ReadOnlyTensorSpan<float>(result, [batchSize, embeddingSize], []);
     }
 
     private static float[] NormalizeSentenceEmbeddings(ReadOnlyTensorSpan<float> sentenceEmbeddings, long[] shape)
@@ -317,27 +308,33 @@ public sealed partial class TextEmbedderMiniLML6 : ITextEmbedder
         int batchSize = (int)shape[0];
         int embeddingSize = (int)shape[2];
 
-        // Create a tensor for the square of the embeddings
-        ReadOnlyTensorSpan<float> squaredEmbeddings = Tensor.Multiply<float>(sentenceEmbeddings, sentenceEmbeddings);
+        float[] result = new float[batchSize * embeddingSize];
+        
+        // Convert to array for easier indexing
+        float[] embeddingsArray = [.. sentenceEmbeddings];
 
-        // Create tensor for sumSquaredEmbeddings
-        var sumSquaredEmbeddings = Tensor.CreateFromShape<float>([batchSize, 1]);
-
-        // Sum the squared embeddings across the embedding dimension
-        for (var batch = 0; batch < batchSize; batch++)
+        for (int batch = 0; batch < batchSize; batch++)
         {
-            ReadOnlyTensorSpan<float> embeddings = squaredEmbeddings.Slice([batch..(batch + 1), 0..embeddingSize]);
-            float clampedSumEmbedding = Math.Max(Tensor.Sum<float>(embeddings), 1e-9f);
-            sumSquaredEmbeddings[batch, 0] = clampedSumEmbedding;
+            // Calculate L2 norm
+            float sumSquared = 0;
+            int offset = batch * embeddingSize;
+            
+            for (int i = 0; i < embeddingSize; i++)
+            {
+                float val = embeddingsArray[offset + i];
+                sumSquared += val * val;
+            }
+
+            // Normalize
+            float norm = MathF.Sqrt(Math.Max(sumSquared, 1e-9f));
+            
+            for (int i = 0; i < embeddingSize; i++)
+            {
+                result[offset + i] = embeddingsArray[offset + i] / norm;
+            }
         }
 
-        // Calculate the square root
-        ReadOnlyTensorSpan<float> sqrtSumSquaredEmbeddings = Tensor.Sqrt<float>(sumSquaredEmbeddings);
-
-        // Divide the sentence embeddings by the denominator (normalize)
-        ReadOnlyTensorSpan<float> normalizedEmbeddings = Tensor.Divide<float>(sentenceEmbeddings, sqrtSumSquaredEmbeddings);
-
-        return [.. normalizedEmbeddings];
+        return result;
     }
 
     /// <summary>

@@ -7,6 +7,8 @@
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<Platforms>AnyCPU;x64</Platforms>
 		<EnableWindowsTargeting>true</EnableWindowsTargeting>
+		<EnableMsixTooling>false</EnableMsixTooling>
+		<GenerateLibraryLayout>true</GenerateLibraryLayout>
 
 		<!-- NuGet Package Configuration -->
 		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
@@ -21,6 +23,12 @@
 		<!-- Platform Requirements -->
 		<SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
 	</PropertyGroup>
+
+	<Target Name="_SkipMakePri" BeforeTargets="_GeneratePriConfigXml">
+		<PropertyGroup>
+			<GeneratePriEnabled>false</GeneratePriEnabled>
+		</PropertyGroup>
+	</Target>
 
 	<ItemGroup>
 		<PackageReference Include="Contoso.AI.AIFeatureCore" Version="0.0.1-beta" />

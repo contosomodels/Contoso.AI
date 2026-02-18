@@ -8,7 +8,15 @@
 		<Platforms>AnyCPU;x64</Platforms>
 		<SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
 		<EnableWindowsTargeting>true</EnableWindowsTargeting>
+		<EnableMsixTooling>false</EnableMsixTooling>
+		<GenerateLibraryLayout>true</GenerateLibraryLayout>
 	</PropertyGroup>
+
+	<Target Name="_SkipMakePri" BeforeTargets="_GeneratePriConfigXml">
+		<PropertyGroup>
+			<GeneratePriEnabled>false</GeneratePriEnabled>
+		</PropertyGroup>
+	</Target>
 
 	<ItemGroup>
 		<ProjectReference Include="..\Contoso.AI.TextEmbedder.MiniLML6\Contoso.AI.TextEmbedder.MiniLML6.csproj" />
