@@ -9,6 +9,7 @@ A mono-repo containing AI-powered NuGet packages for Windows applications. Each 
 | [PersonDetector](PersonDetector/) | Detect people in images using YOLO-based object detection | [![NuGet](https://img.shields.io/nuget/v/Contoso.AI.PersonDetector)](https://www.nuget.org/packages/Contoso.AI.PersonDetector) |
 | [PolitenessAnalyzer](PolitenessAnalyzer/) | Analyze text for politeness levels using BERT-based NLP | [![NuGet](https://img.shields.io/nuget/v/Contoso.AI.PolitenessAnalyzer)](https://www.nuget.org/packages/Contoso.AI.PolitenessAnalyzer) |
 | [ImageSegmenterSINet](ImageSegmenterSINet/) | Segment images using SINet for salient object detection | [![NuGet](https://img.shields.io/nuget/v/Contoso.AI.ImageSegmenterSINet)](https://www.nuget.org/packages/Contoso.AI.ImageSegmenterSINet) |
+| [TextEmbedder](TextEmbedder/) | Generate text embeddings for semantic search and similarity | [![NuGet](https://img.shields.io/nuget/v/Contoso.AI.TextEmbedder.MiniLML6)](https://www.nuget.org/packages/Contoso.AI.TextEmbedder.MiniLML6) |
 
 ## ✨ Features
 
@@ -30,6 +31,7 @@ Install any package via NuGet:
 ```bash
 dotnet add package Contoso.AI.PersonDetector
 dotnet add package Contoso.AI.PolitenessAnalyzer
+dotnet add package Contoso.AI.TextEmbedder.MiniLML6
 ```
 
 All packages follow the same usage pattern:
@@ -66,6 +68,10 @@ Contoso.AI/
 ├── ImageSegmenterSINet/     # Image segmentation project
 │   ├── Contoso.AI.ImageSegmenterSINet/
 │   └── Contoso.AI.ImageSegmenterSINet.ConsoleTest/
+├── TextEmbedder/            # Text embedding projects (multi-model)
+│   ├── Contoso.AI.TextEmbedder/                    # Base interface
+│   ├── Contoso.AI.TextEmbedder.MiniLML6/           # MiniLM-L6-v2 implementation
+│   └── Contoso.AI.TextEmbedder.MiniLML6.ConsoleTest/
 ├── CREATING_NEW_AI_MODEL_PROJECTS.md
 └── README.md
 ```
