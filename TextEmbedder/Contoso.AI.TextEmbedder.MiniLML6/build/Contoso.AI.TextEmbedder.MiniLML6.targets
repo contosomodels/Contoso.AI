@@ -1,0 +1,49 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+<!-- Download models at build time before compilation -->
+<Target Name="DownloadMiniLMLModels" BeforeTargets="BeforeBuild">
+<Message Importance="high" Text="Checking for MiniLM-L6-v2 model files..." />
+
+<!-- Create Models directory if it doesn't exist -->
+<MakeDir Directories="$(MSBuildProjectDirectory)\obj\Models\MiniLM-L6-v2" Condition="!Exists('$(MSBuildProjectDirectory)\obj\Models\MiniLM-L6-v2')" />
+
+<!-- Download model.onnx if it doesn't exist -->
+<!-- Using commit hash d83dd3760b5bfe921f2fe125446b17bf0b7eda8c from https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2 -->
+<DownloadFile 
+SourceUrl="https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/d83dd3760b5bfe921f2fe125446b17bf0b7eda8c/onnx/model.onnx?download=true"
+DestinationFolder="$(MSBuildProjectDirectory)\obj\Models\MiniLM-L6-v2\"
+DestinationFileName="model.onnx"
+Condition="!Exists('$(MSBuildProjectDirectory)\obj\Models\MiniLM-L6-v2\model.onnx')" />
+
+<!-- Download vocab.txt if it doesn't exist -->
+<DownloadFile 
+SourceUrl="https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/d83dd3760b5bfe921f2fe125446b17bf0b7eda8c/vocab.txt?download=true"
+DestinationFolder="$(MSBuildProjectDirectory)\obj\Models\MiniLM-L6-v2\"
+DestinationFileName="vocab.txt"
+Condition="!Exists('$(MSBuildProjectDirectory)\obj\Models\MiniLM-L6-v2\vocab.txt')" />
+
+<Message Importance="high" Text="MiniLM-L6-v2 model files are ready" />
+</Target>
+
+<!-- Copy models to output directory -->
+<Target Name="CopyMiniLMLModels" AfterTargets="Build">
+<Message Importance="high" Text="Copying MiniLM-L6-v2 model files to output directory..." />
+
+<!-- Create output Models directory -->
+<MakeDir Directories="$(OutputPath)\Models\MiniLM-L6-v2" />
+
+<!-- Copy model files -->
+<Copy 
+SourceFiles="$(MSBuildProjectDirectory)\obj\Models\MiniLM-L6-v2\model.onnx"
+DestinationFolder="$(OutputPath)\Models\MiniLM-L6-v2\" 
+SkipUnchangedFiles="true" />
+
+<Copy 
+SourceFiles="$(MSBuildProjectDirectory)\obj\Models\MiniLM-L6-v2\vocab.txt"
+DestinationFolder="$(OutputPath)\Models\MiniLM-L6-v2\" 
+SkipUnchangedFiles="true" />
+
+<Message Importance="high" Text="Model files copied to $(OutputPath)\Models\MiniLM-L6-v2\" />
+</Target>
+
+</Project>

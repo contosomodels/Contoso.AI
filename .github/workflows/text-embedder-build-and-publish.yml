@@ -1,0 +1,149 @@
+name: TextEmbedder - Build, Test, and Publish
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'TextEmbedder/**'
+      - '.github/workflows/text-embedder-build-and-publish.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'TextEmbedder/**'
+      - '.github/workflows/text-embedder-build-and-publish.yml'
+
+env:
+  DOTNET_VERSION: '8.0.x'
+  NUGET_SOURCE: 'https://api.nuget.org/v3/index.json'
+
+defaults:
+  run:
+    working-directory: TextEmbedder
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+    
+    - name: Restore dependencies
+      run: dotnet restore
+    
+    - name: Build solution
+      run: dotnet build --configuration Release --no-restore
+    
+    - name: Run console tests
+      run: dotnet run --project Contoso.AI.TextEmbedder.MiniLML6.ConsoleTest --configuration Release --no-build
+    
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: text-embedder-test-results
+        path: TextEmbedder/TestResults/
+        if-no-files-found: ignore
+
+  publish-nuget:
+    needs: build-and-test
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+    
+    - name: Generate version number
+      id: get-version
+      shell: pwsh
+      run: |
+        # Generate version based on run number: 0.1.RUN_NUMBER-beta
+        $runNumber = "${{ github.run_number }}"
+        $newVersion = "0.1.$runNumber-beta"
+        echo "VERSION=$newVersion" >> $env:GITHUB_OUTPUT
+        echo "Generated version: $newVersion"
+    
+    - name: Update version in csproj files
+      shell: pwsh
+      run: |
+        $newVersion = "${{ steps.get-version.outputs.VERSION }}"
+        
+        # Update base library
+        $baseCsproj = "Contoso.AI.TextEmbedder/Contoso.AI.TextEmbedder.csproj"
+        (Get-Content $baseCsproj) -replace '<Version>.*</Version>', "<Version>$newVersion</Version>" | Set-Content $baseCsproj
+        
+        # Update MiniLML6 implementation
+        $miniLML6Csproj = "Contoso.AI.TextEmbedder.MiniLML6/Contoso.AI.TextEmbedder.MiniLML6.csproj"
+        (Get-Content $miniLML6Csproj) -replace '<Version>.*</Version>', "<Version>$newVersion</Version>" | Set-Content $miniLML6Csproj
+        
+        echo "Updated version to $newVersion in:"
+        echo "  - $baseCsproj"
+        echo "  - $miniLML6Csproj"
+    
+    - name: Build NuGet packages
+      run: dotnet pack --configuration Release
+    
+    - name: Publish to NuGet (Base Library)
+      if: ${{ env.NUGET_API_KEY != '' }}
+      env:
+        NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+      run: |
+        dotnet nuget push "Contoso.AI.TextEmbedder/bin/Release/*.nupkg" `
+          --api-key $env:NUGET_API_KEY `
+          --source ${{ env.NUGET_SOURCE }} `
+          --skip-duplicate
+    
+    - name: Publish to NuGet (MiniLML6)
+      if: ${{ env.NUGET_API_KEY != '' }}
+      env:
+        NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+      run: |
+        dotnet nuget push "Contoso.AI.TextEmbedder.MiniLML6/bin/Release/*.nupkg" `
+          --api-key $env:NUGET_API_KEY `
+          --source ${{ env.NUGET_SOURCE }} `
+          --skip-duplicate
+    
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: text-embedder-v${{ steps.get-version.outputs.VERSION }}
+        name: TextEmbedder v${{ steps.get-version.outputs.VERSION }}
+        body: |
+          ## Contoso.AI Text Embedder Release
+          
+          ### Packages
+          - `Contoso.AI.TextEmbedder` v${{ steps.get-version.outputs.VERSION }} (Base interface library)
+          - `Contoso.AI.TextEmbedder.MiniLML6` v${{ steps.get-version.outputs.VERSION }} (all-MiniLM-L6-v2 implementation)
+          
+          ### Installation
+          ```bash
+          dotnet add package Contoso.AI.TextEmbedder.MiniLML6
+          ```
+          
+          ### Features
+          - Generate 384-dimensional text embeddings
+          - Semantic search and similarity
+          - GPU acceleration with DirectML
+          - Automatic model download
+        files: |
+          TextEmbedder/Contoso.AI.TextEmbedder/bin/Release/*.nupkg
+          TextEmbedder/Contoso.AI.TextEmbedder.MiniLML6/bin/Release/*.nupkg
+        draft: false
+        prerelease: true
