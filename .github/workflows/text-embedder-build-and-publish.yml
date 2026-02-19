@@ -97,8 +97,14 @@ jobs:
         echo "  - $baseCsproj"
         echo "  - $miniLML6Csproj"
     
+    - name: Restore dependencies
+      run: dotnet restore
+    
+    - name: Build solution
+      run: dotnet build --configuration Release --no-restore
+    
     - name: Build NuGet packages
-      run: dotnet pack --configuration Release
+      run: dotnet pack --configuration Release --no-build
     
     - name: Publish to NuGet (Base Library)
       if: ${{ env.NUGET_API_KEY != '' }}
