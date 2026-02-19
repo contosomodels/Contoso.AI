@@ -103,15 +103,18 @@ jobs:
     - name: Build solution
       run: dotnet build --configuration Release --no-restore
     
-    - name: Build NuGet packages
-      run: dotnet pack --configuration Release --no-build
+    - name: Pack NuGet package (Base Library)
+      run: dotnet pack Contoso.AI.TextEmbedder\Contoso.AI.TextEmbedder.csproj --configuration Release --no-build -p:PackageVersion=${{ steps.get-version.outputs.VERSION }}
+    
+    - name: Pack NuGet package (MiniLML6)
+      run: dotnet pack Contoso.AI.TextEmbedder.MiniLML6\Contoso.AI.TextEmbedder.MiniLML6.csproj --configuration Release --no-build -p:PackageVersion=${{ steps.get-version.outputs.VERSION }}
     
     - name: Publish to NuGet (Base Library)
       if: ${{ env.NUGET_API_KEY != '' }}
       env:
         NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
       run: |
-        dotnet nuget push "Contoso.AI.TextEmbedder/bin/Release/*.nupkg" `
+        dotnet nuget push "Contoso.AI.TextEmbedder\bin\Release\*.nupkg" `
           --api-key $env:NUGET_API_KEY `
           --source ${{ env.NUGET_SOURCE }} `
           --skip-duplicate
@@ -121,7 +124,7 @@ jobs:
       env:
         NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
       run: |
-        dotnet nuget push "Contoso.AI.TextEmbedder.MiniLML6/bin/Release/*.nupkg" `
+        dotnet nuget push "Contoso.AI.TextEmbedder.MiniLML6\bin\Release\*.nupkg" `
           --api-key $env:NUGET_API_KEY `
           --source ${{ env.NUGET_SOURCE }} `
           --skip-duplicate
