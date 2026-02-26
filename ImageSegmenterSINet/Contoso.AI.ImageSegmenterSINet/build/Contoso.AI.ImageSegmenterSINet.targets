@@ -6,7 +6,7 @@
     <FloatModelFileName>model.onnx</FloatModelFileName>
     <FloatModelFolderName>float</FloatModelFolderName>
     
-    <QuantizedModelUrl>https://huggingface.co/qualcomm/SINet/resolve/main/SINet_w8a8.onnx.zip</QuantizedModelUrl>
+    <QuantizedModelUrl>https://huggingface.co/qualcomm/SINet/resolve/v0.45.0/SINet_w8a8.onnx.zip</QuantizedModelUrl>
     <QuantizedModelZipFileName>SINet_w8a8.onnx.zip</QuantizedModelZipFileName>
     <QuantizedModelFileName>model.onnx</QuantizedModelFileName>
     <QuantizedModelFolderName>quantized</QuantizedModelFolderName>
