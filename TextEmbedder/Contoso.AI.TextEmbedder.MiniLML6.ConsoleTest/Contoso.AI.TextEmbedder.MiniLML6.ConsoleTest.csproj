@@ -22,4 +22,7 @@
 		<ProjectReference Include="..\Contoso.AI.TextEmbedder.MiniLML6\Contoso.AI.TextEmbedder.MiniLML6.csproj" />
 	</ItemGroup>
 
+	<!-- Import model download targets -->
+	<Import Project="..\Contoso.AI.TextEmbedder.MiniLML6\build\Contoso.AI.TextEmbedder.MiniLML6.targets" />
+
 </Project>
