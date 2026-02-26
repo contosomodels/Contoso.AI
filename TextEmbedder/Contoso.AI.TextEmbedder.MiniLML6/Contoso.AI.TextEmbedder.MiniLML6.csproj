@@ -36,6 +36,7 @@
 		<PackageReference Include="System.Numerics.Tensors" Version="9.0.9" />
 		<PackageReference Include="Microsoft.ML.Tokenizers" Version="1.0.0" />
 		<PackageReference Include="Microsoft.ML.OnnxRuntimeGenAI" Version="0.7.0-rc1" />
+		<PackageReference Include="Microsoft.ML.OnnxRuntime.Extensions" Version="0.14.0" />
 	</ItemGroup>
 
 	<ItemGroup>
